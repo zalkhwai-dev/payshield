@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PayShield AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M16 2 4 7v8c0 7.4 5.1 13.6 12 15 6.9-1.4 12-7.6 12-15V7L16 2Z" fill="var(--accent)"/><path d="m11 16 3.5 3.5L21.5 12" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>PayShield <b>AI</b></span>
+    </div>
+    <button id="langBtn" class="lang" type="button">العربية</button>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1 data-i18n="title">Check before you pay.</h1>
+      <p data-i18n="subtitle">Paste a payment request, invoice or seller message. PayShield's AI agent checks it for scams and only lets the PayPal payment go through if it's safe.</p>
+      <div id="modeNote" class="mode"></div>
+    </section>
+
+    <div class="grid">
+      <form id="checkForm" class="card">
+        <label for="message" data-i18n="msgLabel">Payment request or seller message</label>
+        <textarea id="message" rows="7" dir="auto" data-i18n-ph="msgPh" placeholder="e.g. Your Aramex parcel is on hold. Pay 12 SAR customs fee within 24 hours: aramex-sa-track.xyz"></textarea>
+
+        <div class="shot">
+          <label class="shot-btn" for="shot"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h3l2-2h6l2 2h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span data-i18n="shotBtn">Or upload a screenshot</span></label>
+          <input id="shot" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+          <span id="shotName" class="shot-name"></span>
+          <button id="shotClear" class="chip" type="button" hidden>✕</button>
+        </div>
+
+        <div class="samples">
+          <span data-i18n="tryLabel">Try an example:</span>
+          <button type="button" class="chip" data-sample="delivery" data-i18n="s1">Fake delivery fee</button>
+          <button type="button" class="chip" data-sample="ff" data-i18n="s2">F&amp;F seller</button>
+          <button type="button" class="chip" data-sample="safe" data-i18n="s3">Normal purchase</button>
+        </div>
+
+        <label for="seller" data-i18n="sellerLabel">Seller / recipient (email or name)</label>
+        <input id="seller" type="text" data-i18n-ph="sellerPh" placeholder="seller@example.com">
+
+        <div class="row">
+          <div>
+            <label for="amount" data-i18n="amountLabel">Amount</label>
+            <input id="amount" type="number" min="0.01" step="0.01" value="25" required>
+          </div>
+          <div>
+            <label for="currency" data-i18n="currencyLabel">Currency</label>
+            <select id="currency"><option>USD</option><option>EUR</option><option>GBP</option></select>
+          </div>
+        </div>
+
+        <label for="ptype" data-i18n="typeLabel">How are you asked to pay?</label>
+        <select id="ptype">
+          <option value="goods_services" data-i18n="typeGS">Goods &amp; Services (Buyer Protection)</option>
+          <option value="friends_family" data-i18n="typeFF">Friends &amp; Family</option>
+        </select>
+
+        <button id="checkBtn" class="primary" type="submit" data-i18n="checkBtn">Check this payment</button>
+      </form>
+
+      <section id="result" class="card result empty">
+        <div class="placeholder">
+          <svg viewBox="0 0 48 48" width="44" height="44" aria-hidden="true"><path d="M24 4 7 11v11c0 10.5 7.3 19.4 17 21.4 9.7-2 17-10.9 17-21.4V11L24 4Z" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
+          <p data-i18n="waiting">Your safety report will appear here.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot" data-i18n="footer">Hackathon prototype · PayPal Sandbox only · No real money moves.</footer>
+
+  <template id="resultTpl">
+    <div class="verdict">
+      <div class="gauge"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" class="track"/><circle cx="60" cy="60" r="50" class="bar"/></svg><div class="score"><b></b><small>/100</small></div></div>
+      <div>
+        <span class="badge"></span>
+        <h2 class="summary"></h2>
+        <p class="engine"></p>
+      </div>
+    </div>
+    <p class="ai-text"></p>
+    <div class="marked-wrap"><h3 class="marked-title"></h3><p class="marked" dir="auto"></p></div>
+    <h3 class="reasons-title"></h3>
+    <ul class="reasons"></ul>
+    <details class="steps" open><summary></summary><ol></ol></details>
+    <div class="verify"></div>
+    <div class="pay"></div>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
