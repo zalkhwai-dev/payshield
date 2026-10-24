@@ -20,7 +20,9 @@ Message or screenshot
    ├─► Rule engine: Arabic + English + Arabizi scam signals, link analysis, payment-type checks
    ├─► AI agent investigates with tools, then gives a verdict + explanation (EN/AR)
    │      check_link · expand_short_link · domain_age (RDAP) · safe_browsing · scan_text_rules
-   ├─► Decision: APPROVE / VERIFY / BLOCK  (strong rule evidence can never be overruled)
+   ├─► Decision: APPROVE / VERIFY / BLOCK
+   │      instant "Quick check" from the rules, then the "Final score" once the agent finishes
+   │      (payment stays locked until then)
    └─► Flask server enforces the decision ─► PayPal Orders v2 (sandbox)
 ```
 
@@ -32,6 +34,37 @@ Message or screenshot
 - **Shows its evidence.** Suspicious words are highlighted in the original message.
 - **Screenshot input.** Upload a WhatsApp/SMS screenshot instead of copying text.
 - **Fails safe.** If the AI is unavailable, the rule engine still protects the payment.
+- **Measured on real messages.** Tested on 159 real scam and genuine messages collected in Saudi Arabia (see Benchmark).
+
+### How the final decision is made
+- The rules give an instant **Quick check**. The agent's investigation gives the **Final score**.
+- If the agent finds a scam (score ≥ 70), its verdict decides, and the payment is blocked.
+- If the agent checked and found the message safe, a single keyword rule can only ask the user to **verify**, not block. This stops false alarms on real one-time-code messages like "your code is 4821, do not share it".
+- Without the agent, strong rule signals (asking for a code, lookalike website, raw IP link) block on their own.
+
+## Benchmark: real Saudi messages
+
+We collected **159 real messages** from phones in Saudi Arabia: **64 scams** (fake delivery fees, bank and government impersonation, account takeover, جمعية scams, fake tickets, marketplace scams) and **95 genuine messages** (bank alerts, OTP codes, delivery updates, marketing, personal chats). They cover SMS, WhatsApp, email and social media, and are mostly Arabic, with English and mixed-language messages too. Private details were covered before transcription. The dataset itself is not published, to protect the people in it.
+
+"Flagged" means PayShield did not let the payment go straight through (VERIFY or BLOCK).
+
+| Version | Scams caught | False alarms | Accuracy |
+|---|---|---|---|
+| v1: rules + AI agent | 87.5% (56 / 64) | 15.8% (15 / 95) | 85.5% |
+| v2: improved decision logic | *(final run in progress)* | | |
+
+**How we avoid fooling ourselves:** the 159 real messages are used only as a final exam. Changes are developed on a **separate check set** of 137 synthetic messages (generated, then reviewed by hand) and the real set is run once at the end. A benchmark that tunes on its own test messages would report inflated numbers.
+
+Run it yourself on your own labelled messages:
+
+```bash
+python benchmark.py path/to/messages.csv            # rules only (offline)
+python benchmark.py path/to/messages.csv --agent    # rules + AI agent
+```
+
+## How it fits with PayPal
+
+PayPal already warns users about possible scams on some Friends & Family payments. PayShield works one step earlier and more broadly: it **reads the message behind the payment** (the SMS, WhatsApp chat or invoice that made someone want to pay), explains what is wrong in Arabic or English, investigates the links, and works for any payment type.
 
 ## Run it locally
 
@@ -67,7 +100,7 @@ Enable the Safe Browsing API in Google Cloud and set `GOOGLE_SAFE_BROWSING_KEY`.
 python test_payshield.py
 ```
 
-Includes a mocked AI-agent loop (no API key needed). Covers Arabic delivery scams, OTP theft, lookalike PayPal links, Friends & Family marketplace scams, job-fee scams, normal invoices in English and Arabic, disguised spelling and Arabizi, highlight positions, agent tool calls, the agent clearing a false alarm, falling back to rules when the AI is offline, and server-side enforcement (a blocked check cannot create a PayPal order).
+Includes a mocked AI-agent loop (no API key needed). Also checks that real OTP notices are not treated as credential theft while requests for a code are. Covers Arabic delivery scams, OTP theft, lookalike PayPal links, Friends & Family marketplace scams, job-fee scams, normal invoices in English and Arabic, disguised spelling and Arabizi, highlight positions, agent tool calls, the agent clearing a false alarm, falling back to rules when the AI is offline, and server-side enforcement (a blocked check cannot create a PayPal order).
 
 ## Project structure
 
@@ -79,6 +112,10 @@ payshield/
 ├── tools.py            Investigation tools the agent can call
 ├── normalize.py        Undo scammer disguises, keep positions for highlighting
 ├── paypal_client.py    PayPal Orders v2 (sandbox)
+├── benchmark.py        Measure accuracy on a labelled CSV of messages
+├── build_dataset.py    Turn scam / genuine screenshots into a labelled CSV (Gemini reads them)
+├── make_validation.py  Generate a separate synthetic check set for development
+├── check_ai.py         Diagnose the Gemini key, pick the fastest model
 ├── templates/index.html
 ├── static/app.js       UI, English/Arabic, PayPal buttons
 ├── static/style.css

@@ -151,12 +151,47 @@ for _rule in ARABIZI_RULES:
     _rule["compiled"] = [re.compile(p, re.I) for p in _rule["patterns"]]
 RULES_BY_ID = {r["id"]: r for r in RULES}
 
+# A real OTP notice WARNS you not to share the code. A scam ASKS you to send it.
+OTP_WARNING = re.compile(fold_arabic(
+    r"(do not|don'?t|never|not to)\s+(share|give|disclose|tell)|"
+    r"لا\s*(تشارك|تقم بمشاركة|تعط|تفصح|تقم بالإفصاح|تخبر)|عدم\s*(مشاركة|الإفصاح|اعطاء|إعطاء)|"
+    r"سرية\s*(الرمز|الكود|حسابك|بياناتك)|حافظ على سرية|ما\s*تشارك|\bma? ?t?shari?k|\bla tushari"), re.I)
+CODE_REQUEST = re.compile(fold_arabic(
+    r"\b(send|give|tell|forward|share|read)\b.{0,25}\b(code|otp|pin|password)\b|"
+    r"\b(code|otp)\b.{0,15}\b(to me|back)\b|"
+    r"(ارسل|أرسل|ترسل|ترسله|رسل|عطني|اعطني|أعطني|تعطيني|ابي|أبي|ابغى|أبغى|قول لي|قولي)\s*(لي)?.{0,25}(الرمز|الكود|رمز|كود|الرقم اللي|otp|code)|"
+    r"(ارسله|أرسله|رسله|ترسله|ارسلها|أرسلها|ترسلها|عطنيه|اعطنيه|أعطنيه|عطني اياه|قوله)\s*(لي|لنا)?\s|"
+    r"\b(tgzli|ersel|ersal|ersli|3tni|a3tini|3teni)\b"), re.I)
+
+
+CODE_GIVEN = re.compile(fold_arabic(
+    r"\b(code|otp|pin)\b[^0-9\n]{0,25}\d{4,8}|(رمز|الرمز|كود|الكود)[^0-9\n]{0,30}\d{4,8}|"
+    r"\d{4,8}[^0-9\n]{0,15}(is your|هو رمز|رمز)"), re.I)
+
+
+def is_otp_notice(norm_text: str) -> bool:
+    """True for a normal 'your code is 1234, do not share it' message: it GIVES you a code or
+    warns you to keep it secret, and nobody asks you to send the code anywhere."""
+    if not (OTP_WARNING.search(norm_text) or CODE_GIVEN.search(norm_text)):
+        return False
+    return not asks_for_code(norm_text)
+
+
+def asks_for_code(norm_text: str):
+    """Match object if someone asks the reader to send / give them a code (ignores 'do not share' warnings)."""
+    without_warnings = re.sub(OTP_WARNING.pattern + r".{0,30}", lambda m: " " * len(m.group(0)), norm_text, flags=re.I)
+    return CODE_REQUEST.search(without_warnings)
+
 SHORTENERS = {"bit.ly", "tinyurl.com", "t.co", "goo.gl", "cutt.ly", "is.gd", "rb.gy", "shorturl.at", "tiny.cc"}
 RISKY_TLDS = {".xyz", ".top", ".click", ".live", ".icu", ".shop", ".buzz", ".info", ".online", ".site", ".vip", ".cfd", ".sbs"}
 TRUSTED_BRANDS = ["paypal", "aramex", "smsa", "dhl", "absher", "alrajhi", "stc", "amazon", "noon", "splonline", "apple"]
 OFFICIAL_DOMAINS = {
     "paypal.com", "aramex.com", "smsaexpress.com", "dhl.com", "absher.sa", "alrajhibank.com.sa",
     "stc.com.sa", "amazon.sa", "amazon.com", "noon.com", "splonline.com.sa", "apple.com",
+    # other official domains of the same brands
+    "stcpay.com.sa", "mystc.com.sa", "alrajhitakaful.com", "alrajhi-capital.sa", "alrajhicapital.com",
+    "smsa.com.sa", "dhl.com.sa", "aramex.com.sa", "amazon.ae", "amazon.eg", "noon.sa", "icloud.com",
+    "paypal.me", "paypalobjects.com", "spl.com.sa",
 }
 
 URL_RE = re.compile(r"(https?://[^\s<>\"']+|www\.[^\s<>\"']+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|info|xyz|top|click|live|icu|shop|buzz|online|site|vip|cfd|sbs|ly|gy|gd|co|io|me|sa|ae|link|app)\b(?:/[^\s<>\"']*)?)", re.I)
@@ -231,7 +266,10 @@ def rule_engine(message: str, payment_type: str, amount: float, seller: str):
     norm_msg, imap = normalize(message)
     norm_seller, _ = normalize(seller or "")
 
+    otp_notice = is_otp_notice(norm_msg)
     for rule in RULES:
+        if rule["id"] == "credentials" and otp_notice:
+            continue
         hit = False
         for rx in rule["compiled"]:
             for m in rx.finditer(norm_msg):
@@ -245,9 +283,17 @@ def rule_engine(message: str, payment_type: str, amount: float, seller: str):
             score += rule["weight"]
             reasons.append({"id": rule["id"], "en": rule["en"], "ar": rule["ar"]})
 
+    request = asks_for_code(norm_msg)
+    if request and not any(r["id"] == "credentials" for r in reasons):
+        base = RULES_BY_ID["credentials"]
+        score += base["weight"]
+        reasons.append({"id": "credentials", "en": base["en"], "ar": base["ar"]})
+        s0, e0 = to_original_span(request.start(), request.end(), imap)
+        highlights.append({"start": s0, "end": e0, "id": "credentials"})
+
     for rule in ARABIZI_RULES:
         spans = [m.span() for rx in rule["compiled"] for m in rx.finditer(message)]
-        if not spans:
+        if not spans or (rule["same_as"] == "credentials" and otp_notice):
             continue
         highlights += [{"start": a, "end": b, "id": rule["same_as"]} for a, b in spans]
         if not any(r["id"] == rule["same_as"] for r in reasons):
@@ -353,20 +399,26 @@ def rule_phase(message: str, seller: str = "", amount: float = 0, payment_type: 
 def finalize(rules: dict, ai: dict | None, ai_error: str | None = None, pending: bool = False) -> dict:
     """Combine the rule engine and the AI agent into one decision."""
     rule_score, reasons = rules["rule_score"], rules["reasons"]
+    hard_stop = any(r["id"] in {"credentials", "lookalike", "ip_link"} for r in reasons)
     if ai:
-        # The agent's investigation counts most, so it can also clear false alarms
-        # (e.g. a real invoice that says "urgent"). Strong rule evidence is never overruled.
-        score = round(0.4 * rule_score + 0.6 * ai["risk_score"])
-        if rule_score >= BLOCK_FROM:
-            score = max(score, BLOCK_FROM)
+        # The agent investigated (links, domain age, ...), so its verdict counts most.
+        ai_score = ai["risk_score"]
+        ai_says_safe = ai_score < APPROVE_BELOW
+        score = round(0.3 * rule_score + 0.7 * ai_score)
+        if ai_score >= BLOCK_FROM:
+            # The agent found a scam: weak rule scores must not water it down.
+            score = max(score, ai_score)
+        elif rule_score >= BLOCK_FROM or hard_stop:
+            # Strong rule evidence. If the agent checked and found it safe, ask the user to
+            # verify instead of blocking; otherwise block.
+            score = max(score, APPROVE_BELOW if ai_says_safe else BLOCK_FROM)
         engine = "rules + AI agent"
     else:
         score = rule_score
         engine = "rules"
-
-    # Hard stops: some signals alone are enough to block.
-    if any(r["id"] in {"credentials", "lookalike", "ip_link"} for r in reasons):
-        score = max(score, BLOCK_FROM)
+        # Hard stops: without the agent, some signals alone are enough to block.
+        if hard_stop:
+            score = max(score, BLOCK_FROM)
 
     if score >= BLOCK_FROM:
         decision = "BLOCK"

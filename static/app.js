@@ -27,6 +27,8 @@ const I18N = {
     agentWorking: "Quick check done. The AI agent is investigating links and the seller…",
     agentWait: "Payment unlocks when the AI agent finishes.",
     agentTime: (s) => ` · AI agent: ${s}s`,
+    stageQuick: "Quick check", stageFinal: "Final score", stageRules: "Rules only",
+    stageFrom: (q) => `Quick check said ${q}. The AI agent's investigation updated it.`,
     tools: { check_link: "Checked link", expand_short_link: "Expanded short link", domain_age: "Looked up domain age",
              safe_browsing: "Asked Google Safe Browsing", scan_text_rules: "Scanned text with rules" },
   },
@@ -57,6 +59,8 @@ const I18N = {
     agentWorking: "انتهى الفحص السريع. الوكيل الذكي يحقق في الروابط والبائع…",
     agentWait: "يُفتح الدفع عندما ينتهي الوكيل الذكي.",
     agentTime: (s) => ` · الوكيل الذكي: ${s} ث`,
+    stageQuick: "فحص سريع", stageFinal: "النتيجة النهائية", stageRules: "القواعد فقط",
+    stageFrom: (q) => `الفحص السريع أعطى ${q}، ثم حدّثها تحقيق الوكيل الذكي.`,
     tools: { check_link: "فحص الرابط", expand_short_link: "فك الرابط المختصر", domain_age: "عمر النطاق",
              safe_browsing: "سؤال Google Safe Browsing", scan_text_rules: "فحص النص بالقواعد" },
   },
@@ -119,6 +123,11 @@ function renderResult(r) {
   box.style.setProperty("--cbg", `var(${cbg})`);
 
   box.querySelector(".score b").textContent = r.risk_score;
+  // Which stage this score comes from: instant rule check, final AI verdict, or rules only (no AI).
+  box.querySelector(".stage").textContent =
+    r.agent_pending ? t("stageQuick") : r.engine === "rules" ? t("stageRules") : t("stageFinal");
+  const changed = !r.agent_pending && r.quick_score != null && r.quick_score !== r.risk_score;
+  box.querySelector(".stage-note").textContent = changed ? t("stageFrom")(r.quick_score) : "";
   requestAnimationFrame(() => {
     box.querySelector(".bar").style.strokeDashoffset = 314 - (314 * r.risk_score) / 100;
   });
@@ -310,7 +319,7 @@ async function pollAgent(id) {
     if (!lastResult || lastResult.check_id !== id) return;   // user started a new check
     try {
       const r = await (await fetch(`/api/check/${id}`)).json();
-      if (!r.agent_pending) { lastResult = r; renderResult(r); return; }
+      if (!r.agent_pending) { r.quick_score = lastResult.risk_score; lastResult = r; renderResult(r); return; }
     } catch (e) { /* keep waiting */ }
   }
 }

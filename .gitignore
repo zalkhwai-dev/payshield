@@ -3,3 +3,10 @@
 __pycache__/
 *.pyc
 .DS_Store
+dataset.csv
+dataset_cache.json
+validation*.csv
+validation*.json
+benchmark_*.csv
+benchmark_*.json
+*.numbers

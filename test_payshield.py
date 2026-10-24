@@ -192,3 +192,21 @@ if __name__ == "__main__":
     test_disguised_scams(); test_highlights_point_to_original_text(); test_gemini_agent_loop()
     test_agent_can_clear_false_alarm(); test_agent_failure_falls_back_to_rules()
     print("All v2 tests passed.")
+
+
+def test_otp_notices():
+    from analyzer import rule_phase, finalize
+    notice = rule_phase("Your STC Pay verification code is 7391. Do not share this code with anyone.", "", 0, "goods_services")
+    assert "credentials" not in [r["id"] for r in notice["reasons"]]
+    ask = rule_phase("I sent the code to your number by mistake, send me the 6 digit code please", "", 0, "goods_services")
+    assert "credentials" in [r["id"] for r in ask["reasons"]]
+    # agent found a scam -> its verdict decides, even if rules saw little
+    assert finalize(rule_phase("hello", "", 0, "goods_services"), {"risk_score": 90, "scam_type": "x"})["decision"] == "BLOCK"
+    # agent checked and found it safe -> a hard-stop rule asks to verify instead of blocking
+    assert finalize(ask, {"risk_score": 5, "scam_type": "none"})["decision"] == "VERIFY"
+    assert finalize(ask, None)["decision"] == "BLOCK"
+    print("OTP / combination tests passed.")
+
+
+if __name__ == "__main__":
+    test_otp_notices()
