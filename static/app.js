@@ -21,6 +21,7 @@ const I18N = {
     liveNote: "Connected to PayPal Sandbox", demoPay: "Pay with PayPal (demo)",
     demoHint: "Simulated checkout — no PayPal keys configured yet.",
     paid: (id) => `Payment completed ✓ (order ${id})`, error: "Something went wrong: ",
+    converted: (a, c, u) => `PayPal doesn't process ${c}, so you'll pay $${u} USD (${a} ${c}, fixed rate ${c === "SAR" ? "3.75" : "3.6725"} ${c} = 1 USD).`,
     shotBtn: "Or upload a screenshot", markedTitle: "Suspicious parts of the message",
     stepsTitle: (n) => `How the AI agent investigated (${n} ${n === 1 ? "step" : "steps"})`, needInput: "Paste a message or upload a screenshot.",
     fromImage: "Text read from your screenshot",
@@ -53,6 +54,7 @@ const I18N = {
     liveNote: "متصل ببيئة PayPal التجريبية", demoPay: "ادفع عبر PayPal (تجريبي)",
     demoHint: "دفع محاكى — لم تُضف مفاتيح PayPal بعد.",
     paid: (id) => `تم الدفع بنجاح ✓ (طلب ${id})`, error: "حدث خطأ: ",
+    converted: (a, c, u) => `لا يدعم PayPal عملة ${c === "SAR" ? "الريال السعودي" : "الدرهم الإماراتي"}، لذلك ستدفع ${u} دولار أمريكي (${a} ${c} بسعر ثابت ${c === "SAR" ? "3.75" : "3.6725"} = 1 دولار).`,
     shotBtn: "أو ارفع لقطة شاشة", markedTitle: "الأجزاء المشبوهة في الرسالة",
     stepsTitle: (n) => `كيف حقق الوكيل الذكي (${n} خطوات)`, needInput: "الصق رسالة أو ارفع لقطة شاشة.",
     fromImage: "النص المقروء من لقطة الشاشة",
@@ -261,9 +263,17 @@ function showPaid(id) {
   $("#result .pay").replaceChildren(div);
 }
 
+function conversionNote(r) {
+  if (!r.pay_currency || r.pay_currency === r.currency) return null;
+  const p = document.createElement("p"); p.className = "hint";
+  p.textContent = t("converted")(r.amount, r.currency, Number(r.pay_amount).toFixed(2));
+  return p;
+}
+
 async function renderPay(r) {
   const pay = $("#result .pay");
   if (r.paid_id) return showPaid(r.paid_id);
+  const note = conversionNote(r);
   if (config.demo_mode) {
     const btn = document.createElement("button"); btn.className = "demo-pay"; btn.type = "button"; btn.textContent = t("demoPay");
     btn.onclick = async () => {
@@ -274,13 +284,13 @@ async function renderPay(r) {
       } catch (e) { alert(t("error") + e.message); }
     };
     const hint = document.createElement("p"); hint.className = "hint"; hint.textContent = t("demoHint");
-    pay.replaceChildren(btn, hint);
+    pay.replaceChildren(...[note, btn, hint].filter(Boolean));
     return;
   }
   const holder = document.createElement("div"); holder.id = "paypal-buttons";
-  pay.replaceChildren(holder);
+  pay.replaceChildren(...[note, holder].filter(Boolean));
   try {
-    await loadPayPalSdk(r.currency);
+    await loadPayPalSdk(r.pay_currency || r.currency);
     window.paypal.Buttons({
       createOrder: async () => (await api("/api/orders", { check_id: r.check_id })).id,
       onApprove: async (data) => {

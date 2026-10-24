@@ -38,7 +38,17 @@ app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
 # In-memory store of checks. Fine for a hackathon demo; use a database in production.
 CHECKS: dict[str, dict] = {}
-SUPPORTED_CURRENCIES = {"USD", "EUR", "GBP", "AUD", "CAD"}
+SUPPORTED_CURRENCIES = {"USD", "EUR", "GBP", "AUD", "CAD", "SAR", "AED"}
+# PayPal does not process SAR or AED. Both are pegged to the US dollar at fixed official
+# rates, so the check uses the local amount and PayPal is charged the exact USD equivalent.
+USD_PEG = {"SAR": 3.75, "AED": 3.6725}
+
+
+def paypal_amount(amount: float, currency: str) -> tuple[float, str]:
+    """Amount and currency PayPal is actually charged in."""
+    if currency in USD_PEG:
+        return round(amount / USD_PEG[currency], 2), "USD"
+    return amount, currency
 
 
 @app.get("/")
@@ -86,13 +96,15 @@ def check():
         currency = "USD"
     payment_type = body.get("payment_type", "goods_services")
     seller = str(body.get("seller", "")).strip()
+    pay_amount, pay_currency = paypal_amount(amount, currency)
 
     # Phase 1 (instant): rule engine. Phase 2 (background): AI agent investigation.
-    rules = rule_phase(message, seller, amount, payment_type)
+    rules = rule_phase(message, seller, pay_amount if pay_currency == "USD" else amount, payment_type)
     use_agent = bool(provider())
     result = finalize(rules, None, pending=use_agent)
     check_id = uuid.uuid4().hex[:12]
     base = {"check_id": check_id, "amount": amount, "currency": currency,
+            "pay_amount": pay_amount, "pay_currency": pay_currency,
             "analyzed_text": message, "extracted_from_image": extracted}
     record = CHECKS[check_id] = {
         "decision": result["decision"],
@@ -100,6 +112,8 @@ def check():
         "pending": use_agent,
         "amount": amount,
         "currency": currency,
+        "pay_amount": pay_amount,
+        "pay_currency": pay_currency,
         "seller": seller,
         "risk_score": result["risk_score"],
         "result": {**base, **result},
@@ -170,7 +184,7 @@ def create_order():
         record["order_id"] = order_id
         return jsonify({"id": order_id, "demo": True})
     try:
-        order = paypal_client.create_order(record["amount"], record["currency"], description, check_id)
+        order = paypal_client.create_order(record["pay_amount"], record["pay_currency"], description, check_id)
     except Exception as exc:
         return jsonify({"error": f"PayPal error: {exc}"}), 502
     record["order_id"] = order["id"]
