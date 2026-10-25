@@ -48,10 +48,12 @@ We collected **159 real messages** from phones in Saudi Arabia: **64 scams** (fa
 
 "Flagged" means PayShield did not let the payment go straight through (VERIFY or BLOCK).
 
-| Version | Scams caught | False alarms | Accuracy |
-|---|---|---|---|
-| v1: rules + AI agent | 87.5% (56 / 64) | 15.8% (15 / 95) | 85.5% |
-| v2: improved decision logic | *(final run in progress)* | | |
+| Version | Scams caught | Scams blocked outright | False alarms | Real messages blocked | Accuracy |
+|---|---|---|---|---|---|
+| v1: rules + AI agent | 87.5% (56 / 64) | 14.1% (9 / 64) | 15.8% (15 / 95) | 5.3% (5 / 95) | 85.5% |
+| **v2: AI verdict decides, OTP fix** | **92.2% (59 / 64)** | **82.8% (53 / 64)** | 15.8% (15 / 95) | 10.5% (10 / 95) | **87.4%** |
+
+v2 catches more scams and blocks most of them outright instead of only asking the user to verify. The trade-off: real marketing messages that look like scams (prize ads, recharge offers with short links) are blocked more often. Remaining misses include fake event tickets and fake government notices with no link to investigate. These are the next things to improve.
 
 **How we avoid fooling ourselves:** the 159 real messages are used only as a final exam. Changes are developed on a **separate check set** of 137 synthetic messages (generated, then reviewed by hand) and the real set is run once at the end. A benchmark that tunes on its own test messages would report inflated numbers.
 
