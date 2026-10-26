@@ -206,7 +206,8 @@ function renderSteps(box, r) {
   steps.forEach((s) => {
     const li = document.createElement("li");
     const b = document.createElement("b"); b.textContent = t("tools")[s.tool] || s.tool;
-    const arg = Object.values(s.args || {})[0] || "";
+    let arg = String(Object.values(s.args || {})[0] || "").replace(/\s+/g, " ");
+    if (arg.length > 60) arg = arg.slice(0, 57) + "…";   // e.g. the whole message passed to the text scan
     const code = document.createElement("code"); code.textContent = s.result;
     li.append(b, document.createTextNode(arg ? `: ${arg}` : ""), code);
     ol.append(li);
