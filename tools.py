@@ -42,7 +42,8 @@ def check_link(url: str) -> dict:
     from analyzer import check_links  # local import avoids a circular import
     score, findings, hosts = check_links(url)
     return {"host": hosts[0] if hosts else _host(url), "risk_points": score,
-            "findings": [f[2] for f in findings] or ["No offline warning signs for this link."]}
+            "findings": [f[2] for f in findings] or ["No offline warning signs for this link."],
+            "findings_ar": [f[3] for f in findings] or ["لا توجد علامات تحذيرية في هذا الرابط."]}
 
 
 def expand_short_link(url: str) -> dict:
@@ -115,7 +116,8 @@ def safe_browsing(url: str) -> dict:
 def scan_text_rules(text: str) -> dict:
     from analyzer import rule_engine
     score, reasons, _, _ = rule_engine(text, "goods_services", 0, "")
-    return {"risk_points": score, "signals": [r["en"] for r in reasons]}
+    return {"risk_points": score, "signals": [r["en"] for r in reasons],
+            "signals_ar": [r["ar"] for r in reasons]}
 
 
 TOOLS = {
@@ -130,6 +132,62 @@ TOOLS = {
     "scan_text_rules": (scan_text_rules, "Run PayShield's Arabic/English scam rule engine on a piece of text.",
                         {"text": "Text to scan"}),
 }
+
+
+def available_tools() -> dict:
+    """Tools offered to the agent. Safe Browsing only when a key is configured,
+    so the agent never wastes a step on a tool that cannot answer."""
+    return {n: v for n, v in TOOLS.items() if n != "safe_browsing" or os.getenv("GOOGLE_SAFE_BROWSING_KEY")}
+
+
+def _ar_count(n: int, one: str, two: str, few: str, many: str) -> str:
+    """Arabic number + noun: 1 يوم واحد, 2 يومين, 3-10 أيام, 11+ يوماً."""
+    if n == 1:
+        return one
+    if n == 2:
+        return two
+    return f"{n} {few if 3 <= n % 100 <= 10 else many}"
+
+
+def describe(name: str, r: dict) -> tuple[str, str]:
+    """One plain sentence (English, Arabic) saying what a tool found, for the user."""
+    if r.get("error") and name != "expand_short_link":
+        return "Could not complete this check.", "تعذّر إكمال هذا الفحص."
+    if name == "check_link":
+        return " ".join(r.get("findings", [])), " ".join(r.get("findings_ar", []))
+    if name == "domain_age":
+        if r.get("registered") is False:
+            return ("This website is not registered (or was just taken down), so the link cannot be real.",
+                    "هذا الموقع غير مسجّل (أو حُذف للتو)، لذلك لا يمكن أن يكون الرابط حقيقياً.")
+        days = r.get("age_days")
+        if days is not None:
+            if days < 90:
+                return (f"This website was created only {days} day{'s' if days != 1 else ''} ago. "
+                        "Scam sites are usually brand new.",
+                        f"أُنشئ هذا الموقع قبل {_ar_count(days, 'يوم واحد', 'يومين', 'أيام', 'يوماً')} فقط. "
+                        "مواقع الاحتيال عادةً جديدة جداً.")
+            years = days // 365
+            age_en = f"{years} year{'s' if years != 1 else ''}" if years >= 1 else f"{days} days"
+            age_ar = _ar_count(years, "سنة واحدة", "سنتين", "سنوات", "سنة") if years >= 1 else \
+                _ar_count(days, "يوم واحد", "يومين", "أيام", "يوماً")
+            return (f"This website has existed for {age_en}.", f"هذا الموقع موجود منذ {age_ar}.")
+        return "The registration date could not be found.", "تعذّر معرفة تاريخ تسجيل الموقع."
+    if name == "expand_short_link":
+        if r.get("final_host"):
+            return (f"This link really goes to {r['final_host']}.", f"هذا الرابط يذهب فعلياً إلى {r['final_host']}.")
+        return "The real destination of this link could not be opened.", "تعذّر فتح الوجهة الحقيقية لهذا الرابط."
+    if name == "safe_browsing":
+        if not r.get("available"):
+            return "Google Safe Browsing was not available.", "خدمة Google Safe Browsing غير متاحة."
+        if r.get("listed_as_dangerous"):
+            return ("Google lists this link as dangerous.", "تصنّف Google هذا الرابط كرابط خطير.")
+        return "Google has no reports about this link.", "لا توجد بلاغات لدى Google عن هذا الرابط."
+    if name == "scan_text_rules":
+        n = len(r.get("signals", []))
+        if not n:
+            return "No scam phrases found in the text.", "لم توجد عبارات احتيال في النص."
+        return (f"Found {n} warning sign{'s' if n != 1 else ''} in the text.", f"وُجدت {_ar_count(n, 'علامة تحذيرية واحدة', 'علامتان تحذيريتان', 'علامات تحذيرية', 'علامة تحذيرية')} في النص.")
+    return "", ""
 
 
 def run_tool(name: str, args: dict) -> dict:

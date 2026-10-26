@@ -126,3 +126,4 @@ textarea:focus, input:focus, select:focus { outline: 2px solid var(--accent); ou
 
 .hero-badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .mode.proof { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.steps .step-found { display: block; margin-top: 2px; color: var(--muted); font-size: 13.5px; }

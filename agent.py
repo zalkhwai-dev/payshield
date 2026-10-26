@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-from tools import TOOLS, run_tool
+from tools import available_tools, describe, run_tool
 
 MAX_TOOL_ROUNDS = 6
 TIMEOUT = 40          # per request to the AI model
@@ -239,7 +239,7 @@ def _gemini_call(contents, with_tools=True, model=None, timeout=None, system=Tru
             {"name": n, "description": d,
              "parameters": {"type": "OBJECT", "properties": {k: {"type": "STRING", "description": v} for k, v in p.items()},
                             "required": list(p)}}
-            for n, (_, d, p) in TOOLS.items()]}]
+            for n, (_, d, p) in available_tools().items()]}]
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     headers = {"x-goog-api-key": os.environ["GEMINI_API_KEY"].strip()}
     t = time.monotonic()
@@ -273,7 +273,9 @@ def _run_gemini(prompt):
             return "".join(p.get("text", "") for p in content.get("parts", [])), steps
         responses = []
         for c, result in zip(calls, _run_tools_parallel([(c["name"], c.get("args", {})) for c in calls])):
-            steps.append({"tool": c["name"], "args": c.get("args", {}), "result": _summarize(result)})
+            en, ar = describe(c["name"], result)
+            steps.append({"tool": c["name"], "args": c.get("args", {}), "result": _summarize(result),
+                          "summary_en": en, "summary_ar": ar})
             responses.append({"functionResponse": {"name": c["name"], "response": result}})
         contents.append({"role": "user", "parts": responses})
     contents.append({"role": "user", "parts": [{"text": "Stop investigating and give the final JSON now."}]})
@@ -290,7 +292,7 @@ def _anthropic_call(messages, with_tools=True):
                           "input_schema": {"type": "object",
                                            "properties": {k: {"type": "string", "description": v} for k, v in p.items()},
                                            "required": list(p)}}
-                         for n, (_, d, p) in TOOLS.items()]
+                         for n, (_, d, p) in available_tools().items()]
     r = _post("https://api.anthropic.com/v1/messages", json=body, timeout=TIMEOUT,
               headers={"x-api-key": os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01"})
     return r.json()
@@ -309,7 +311,9 @@ def _run_anthropic(prompt):
             return "".join(b.get("text", "") for b in resp["content"] if b.get("type") == "text"), steps
         results = []
         for u, result in zip(uses, _run_tools_parallel([(u["name"], u.get("input", {})) for u in uses])):
-            steps.append({"tool": u["name"], "args": u.get("input", {}), "result": _summarize(result)})
+            en, ar = describe(u["name"], result)
+            steps.append({"tool": u["name"], "args": u.get("input", {}), "result": _summarize(result),
+                          "summary_en": en, "summary_ar": ar})
             results.append({"type": "tool_result", "tool_use_id": u["id"],
                             "content": json.dumps(result, ensure_ascii=False)})
         messages.append({"role": "user", "content": results})

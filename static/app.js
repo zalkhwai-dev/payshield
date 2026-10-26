@@ -208,7 +208,8 @@ function renderSteps(box, r) {
     const b = document.createElement("b"); b.textContent = t("tools")[s.tool] || s.tool;
     let arg = String(Object.values(s.args || {})[0] || "").replace(/\s+/g, " ");
     if (arg.length > 60) arg = arg.slice(0, 57) + "…";   // e.g. the whole message passed to the text scan
-    const code = document.createElement("code"); code.textContent = s.result;
+    const found = (lang === "ar" ? s.summary_ar : s.summary_en) || s.result;   // plain sentence, raw data as fallback
+    const code = document.createElement("span"); code.className = "step-found"; code.textContent = found;
     li.append(b, document.createTextNode(arg ? `: ${arg}` : ""), code);
     ol.append(li);
   });
