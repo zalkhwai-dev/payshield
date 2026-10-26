@@ -13,6 +13,7 @@ pushed through by editing the web page.
 
 import os
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,6 +39,50 @@ app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 
 # In-memory store of checks. Fine for a hackathon demo; use a database in production.
 CHECKS: dict[str, dict] = {}
+MAX_CHECKS = 2000                      # keep memory bounded on a small server
+
+# --- protection for a public demo ---------------------------------------------
+# Limits are off locally. On a hosted demo set CHECKS_PER_HOUR and AI_DAILY_CAP so
+# visitors cannot use up the free Gemini quota; after the cap the rules still work.
+CHECKS_PER_HOUR = int(os.getenv("CHECKS_PER_HOUR", "0") or 0)
+AI_DAILY_CAP = int(os.getenv("AI_DAILY_CAP", "0") or 0)
+_limit_lock = threading.Lock()
+_visits: dict[str, list[float]] = {}
+_ai_used = {"day": "", "count": 0}
+
+
+def _client_ip() -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    return (forwarded.split(",")[0].strip() if forwarded else request.remote_addr) or "?"
+
+
+def _rate_limited() -> bool:
+    if not CHECKS_PER_HOUR:
+        return False
+    now = time.time()
+    with _limit_lock:
+        hits = [t for t in _visits.get(_client_ip(), []) if now - t < 3600]
+        if len(hits) >= CHECKS_PER_HOUR:
+            _visits[_client_ip()] = hits
+            return True
+        _visits[_client_ip()] = hits + [now]
+        if len(_visits) > 5000:
+            _visits.clear()
+    return False
+
+
+def _take_ai_budget() -> bool:
+    """True if this check may use the AI (counts against the daily cap)."""
+    if not AI_DAILY_CAP:
+        return True
+    today = datetime.now(timezone.utc).date().isoformat()
+    with _limit_lock:
+        if _ai_used["day"] != today:
+            _ai_used.update(day=today, count=0)
+        if _ai_used["count"] >= AI_DAILY_CAP:
+            return False
+        _ai_used["count"] += 1
+        return True
 SUPPORTED_CURRENCIES = {"USD", "EUR", "GBP", "AUD", "CAD", "SAR", "AED"}
 # PayPal does not process SAR or AED. Both are pegged to the US dollar at fixed official
 # rates, so the check uses the local amount and PayPal is charged the exact USD equivalent.
@@ -67,7 +112,10 @@ def config():
 
 @app.post("/api/check")
 def check():
+    if _rate_limited():
+        return jsonify({"error": "Too many checks from your connection. Please try again in a while."}), 429
     body = request.get_json(silent=True) or {}
+    ai_allowed = bool(provider()) and _take_ai_budget()
     message = str(body.get("message", "")).strip()
     extracted = None
     image = body.get("image")
@@ -79,6 +127,9 @@ def check():
             return jsonify({"error": "Screenshot is too large (max about 5 MB)."}), 400
         if not provider():
             return jsonify({"error": "Reading screenshots needs the AI model. Add your Gemini key to .env."}), 400
+        if not ai_allowed:
+            return jsonify({"error": "This demo's daily AI limit is reached, so screenshots can't be read right now. "
+                                     "Please paste the message text instead."}), 429
         extracted = extract_text_from_image(image, mime)
         if not extracted:
             return jsonify({"error": "Could not read text from the screenshot. Try pasting the text instead."}), 502
@@ -100,9 +151,13 @@ def check():
 
     # Phase 1 (instant): rule engine. Phase 2 (background): AI agent investigation.
     rules = rule_phase(message, seller, pay_amount if pay_currency == "USD" else amount, payment_type)
-    use_agent = bool(provider())
-    result = finalize(rules, None, pending=use_agent)
+    use_agent = ai_allowed
+    capped = "This demo's daily AI limit is reached, so only the rule engine checked this." \
+        if provider() and not ai_allowed else None
+    result = finalize(rules, None, capped, pending=use_agent)
     check_id = uuid.uuid4().hex[:12]
+    while len(CHECKS) >= MAX_CHECKS:
+        CHECKS.pop(next(iter(CHECKS)))
     base = {"check_id": check_id, "amount": amount, "currency": currency,
             "pay_amount": pay_amount, "pay_currency": pay_currency,
             "analyzed_text": message, "extracted_from_image": extracted}

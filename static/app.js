@@ -6,7 +6,7 @@ const I18N = {
     msgLabel: "Payment request or seller message",
     msgPh: "e.g. Your Aramex parcel is on hold. Pay a customs fee within 24 hours: aramex-sa-track.xyz",
     tryLabel: "Try an example:", s1: "Fake delivery fee", s2: "F&F seller", s3: "Normal purchase",
-    s4: "\"Send me the code\"", s5: "Real bank code",
+    s4: "\"New number\" scam", s5: "Friend splitting a bill",
     proof: "Tested on 159 real messages from Saudi Arabia: 92% of scams caught",
     sellerLabel: "Seller / recipient (email or name)", sellerPh: "seller@example.com",
     amountLabel: "Amount", currencyLabel: "Currency", typeLabel: "How are you asked to pay?",
@@ -41,7 +41,7 @@ const I18N = {
     msgLabel: "طلب الدفع أو رسالة البائع",
     msgPh: "مثال: شحنتك من أرامكس معلقة. ادفع رسوم الجمارك خلال 24 ساعة: aramex-sa-track.xyz",
     tryLabel: "جرّب مثالاً:", s1: "رسوم توصيل مزيفة", s2: "بائع يطلب أصدقاء وعائلة", s3: "شراء عادي",
-    s4: "«أرسل لي الكود»", s5: "رمز بنك حقيقي",
+    s4: "احتيال «رقمي الجديد»", s5: "صديقة تقسم الفاتورة",
     proof: "تم اختباره على 159 رسالة حقيقية من السعودية: اكتشف 92% من رسائل الاحتيال",
     sellerLabel: "البائع / المستلم (بريد أو اسم)", sellerPh: "seller@example.com",
     amountLabel: "المبلغ", currencyLabel: "العملة", typeLabel: "كيف يُطلب منك الدفع؟",
@@ -81,13 +81,13 @@ const SAMPLES = {
     message: "Hi! PS5 brand new sealed, only $150 because I'm moving abroad this week. Please send as Friends & Family to avoid fees, I'll ship today. Many other buyers waiting so be quick.",
     seller: "gamer.deals22@outlook.com", amount: 150, ptype: "friends_family",
   },
-  code: {
-    message: "السلام عليكم، آسفة على الإزعاج 🙏 أرسلت لك كود التحقق بالغلط وأنا أسجل في أبشر، وصلك على جوالك برسالة نصية. تكفين أرسلي لي الكود بسرعة قبل ينتهي، وبحول لك 200 ريال هدية على تعبك",
-    seller: "+966 5x xxx xxxx", amount: 200, ptype: "friends_family",
+  newnum: {
+    message: "هلا حبيبتي 🌸 هذا رقمي الجديد احفظيه، جوالي القديم خرب. عندي موضوع ضروري: أمي في المستشفى والبنك موقف حسابي. تقدرين تحولين لي 500 ريال الحين عبر PayPal (أصدقاء وعائلة) وأرجعها لك بكرة إن شاء الله؟ لا تتصلين الحين لأني ما أقدر أرد",
+    seller: "+966 5x xxx xxxx", amount: 500, ptype: "friends_family",
   },
-  otp: {
-    message: "رمز التحقق لعملية الشراء من نون بمبلغ 230.00 ريال هو 4821. لا تشارك هذا الرمز مع أي شخص، ولن يطلبه منك البنك أبداً.",
-    seller: "noon.com", amount: 230, ptype: "goods_services",
+  split: {
+    message: "هلا نورة! هذي فاتورة عشاء أمس في المطعم، نصيبك 85 ريال. حوليها لي على PayPal لما تفضين، مو مستعجلة 😊",
+    seller: "Sara (friend)", amount: 85, ptype: "friends_family",
   },
   safe: {
     message: "Invoice #1042 from Riyadh Calligraphy Studio for the custom wedding invitation design we agreed on last week. Thank you for your order!",
