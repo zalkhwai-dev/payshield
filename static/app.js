@@ -16,7 +16,7 @@ const I18N = {
     footer: "Hackathon prototype · PayPal Sandbox only · No real money moves.",
     reasons: "What PayShield found", noReasons: "No warning signs found.",
     APPROVE: "SAFE TO PAY", VERIFY: "VERIFY FIRST", BLOCK: "BLOCKED",
-    engine: (e, t) => `Checked by ${e}${t && !/^none/i.test(t) ? " · Type: " + t : ""}`,
+    engine: (e, t) => `Checked by ${e}${t && !/^none/i.test(t) ? " · Type: " + t.replace(/[_-]+/g, " ") : ""}`,
     verifyTitle: "Answer honestly before paying:", yes: "Yes", no: "No", confirm: "Confirm answers",
     blockedMsg: "Payment blocked. Do not send money to this person.",
     demoNote: "Demo mode: add your PayPal sandbox keys in .env to use real PayPal checkout.",
