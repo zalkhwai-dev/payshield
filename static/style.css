@@ -123,3 +123,6 @@ textarea:focus, input:focus, select:focus { outline: 2px solid var(--accent); ou
 .spinner { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2.5px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+.hero-badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mode.proof { background: transparent; border: 1px solid var(--line); color: var(--muted); }

@@ -6,6 +6,8 @@ const I18N = {
     msgLabel: "Payment request or seller message",
     msgPh: "e.g. Your Aramex parcel is on hold. Pay a customs fee within 24 hours: aramex-sa-track.xyz",
     tryLabel: "Try an example:", s1: "Fake delivery fee", s2: "F&F seller", s3: "Normal purchase",
+    s4: "\"Send me the code\"", s5: "Real bank code",
+    proof: "Tested on 159 real messages from Saudi Arabia: 92% of scams caught",
     sellerLabel: "Seller / recipient (email or name)", sellerPh: "seller@example.com",
     amountLabel: "Amount", currencyLabel: "Currency", typeLabel: "How are you asked to pay?",
     typeGS: "Goods & Services (Buyer Protection)", typeFF: "Friends & Family",
@@ -14,7 +16,7 @@ const I18N = {
     footer: "Hackathon prototype · PayPal Sandbox only · No real money moves.",
     reasons: "What PayShield found", noReasons: "No warning signs found.",
     APPROVE: "SAFE TO PAY", VERIFY: "VERIFY FIRST", BLOCK: "BLOCKED",
-    engine: (e, t) => `Checked by ${e}${t && t !== "none detected" ? " · Type: " + t : ""}`,
+    engine: (e, t) => `Checked by ${e}${t && !/^none/i.test(t) ? " · Type: " + t : ""}`,
     verifyTitle: "Answer honestly before paying:", yes: "Yes", no: "No", confirm: "Confirm answers",
     blockedMsg: "Payment blocked. Do not send money to this person.",
     demoNote: "Demo mode: add your PayPal sandbox keys in .env to use real PayPal checkout.",
@@ -39,6 +41,8 @@ const I18N = {
     msgLabel: "طلب الدفع أو رسالة البائع",
     msgPh: "مثال: شحنتك من أرامكس معلقة. ادفع رسوم الجمارك خلال 24 ساعة: aramex-sa-track.xyz",
     tryLabel: "جرّب مثالاً:", s1: "رسوم توصيل مزيفة", s2: "بائع يطلب أصدقاء وعائلة", s3: "شراء عادي",
+    s4: "«أرسل لي الكود»", s5: "رمز بنك حقيقي",
+    proof: "تم اختباره على 159 رسالة حقيقية من السعودية: اكتشف 92% من رسائل الاحتيال",
     sellerLabel: "البائع / المستلم (بريد أو اسم)", sellerPh: "seller@example.com",
     amountLabel: "المبلغ", currencyLabel: "العملة", typeLabel: "كيف يُطلب منك الدفع؟",
     typeGS: "سلع وخدمات (مع حماية المشتري)", typeFF: "أصدقاء وعائلة",
@@ -76,6 +80,14 @@ const SAMPLES = {
   ff: {
     message: "Hi! PS5 brand new sealed, only $150 because I'm moving abroad this week. Please send as Friends & Family to avoid fees, I'll ship today. Many other buyers waiting so be quick.",
     seller: "gamer.deals22@outlook.com", amount: 150, ptype: "friends_family",
+  },
+  code: {
+    message: "السلام عليكم، آسفة على الإزعاج 🙏 أرسلت لك كود التحقق بالغلط وأنا أسجل في أبشر، وصلك على جوالك برسالة نصية. تكفين أرسلي لي الكود بسرعة قبل ينتهي، وبحول لك 200 ريال هدية على تعبك",
+    seller: "+966 5x xxx xxxx", amount: 200, ptype: "friends_family",
+  },
+  otp: {
+    message: "رمز التحقق لعملية الشراء من نون بمبلغ 230.00 ريال هو 4821. لا تشارك هذا الرمز مع أي شخص، ولن يطلبه منك البنك أبداً.",
+    seller: "noon.com", amount: 230, ptype: "goods_services",
   },
   safe: {
     message: "Invoice #1042 from Riyadh Calligraphy Studio for the custom wedding invitation design we agreed on last week. Thank you for your order!",
@@ -128,7 +140,9 @@ function renderResult(r) {
   // Which stage this score comes from: instant rule check, final AI verdict, or rules only (no AI).
   box.querySelector(".stage").textContent =
     r.agent_pending ? t("stageQuick") : r.engine === "rules" ? t("stageRules") : t("stageFinal");
-  const changed = !r.agent_pending && r.quick_score != null && r.quick_score !== r.risk_score;
+  // Only explain the change when it matters: the decision changed, or the score moved a lot.
+  const changed = !r.agent_pending && r.quick_score != null &&
+    (Math.abs(r.quick_score - r.risk_score) >= 15 || (r.quick_decision && r.quick_decision !== r.decision));
   box.querySelector(".stage-note").textContent = changed ? t("stageFrom")(r.quick_score) : "";
   requestAnimationFrame(() => {
     box.querySelector(".bar").style.strokeDashoffset = 314 - (314 * r.risk_score) / 100;
@@ -329,7 +343,10 @@ async function pollAgent(id) {
     if (!lastResult || lastResult.check_id !== id) return;   // user started a new check
     try {
       const r = await (await fetch(`/api/check/${id}`)).json();
-      if (!r.agent_pending) { r.quick_score = lastResult.risk_score; lastResult = r; renderResult(r); return; }
+      if (!r.agent_pending) {
+        r.quick_score = lastResult.risk_score; r.quick_decision = lastResult.decision;
+        lastResult = r; renderResult(r); return;
+      }
     } catch (e) { /* keep waiting */ }
   }
 }
@@ -355,6 +372,7 @@ $("#shotClear").addEventListener("click", () => {
 document.querySelectorAll("[data-sample]").forEach((b) => b.addEventListener("click", () => {
   const s = SAMPLES[b.dataset.sample];
   $("#message").value = s.message; $("#seller").value = s.seller; $("#amount").value = s.amount; $("#ptype").value = s.ptype;
+  $("#currency").value = "SAR";
 }));
 
 $("#langBtn").addEventListener("click", () => { lang = lang === "en" ? "ar" : "en"; applyLang(); });

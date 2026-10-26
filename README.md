@@ -1,5 +1,7 @@
 # PayShield AI 🛡️
 
+**Try it live: [payshield-2w44.onrender.com](https://payshield-2w44.onrender.com)** (free hosting, so the first visit can take about a minute to wake up). Log in at checkout with a PayPal sandbox test account.
+
 **Check before you pay.** PayShield is an AI agent that sits in front of PayPal checkout. You paste a payment request, invoice or seller message, and the agent decides whether the payment should go through:
 
 | Decision | What happens |
