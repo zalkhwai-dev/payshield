@@ -1,0 +1,28 @@
+# Render Blueprint: one click deploys PayShield as a web service.
+# Secrets are left empty here (sync: false) and entered in the Render dashboard.
+services:
+  - type: web
+    name: payshield
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # One worker on purpose: checks are kept in memory, and the AI agent runs in a
+    # background thread, so threads (not extra workers) handle concurrent visitors.
+    startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 120
+    healthCheckPath: /api/config
+    autoDeploy: true
+    envVars:
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: CHECKS_PER_HOUR
+        value: "20"
+      - key: AI_DAILY_CAP
+        value: "100"

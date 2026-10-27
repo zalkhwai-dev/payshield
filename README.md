@@ -70,6 +70,12 @@ python benchmark.py path/to/messages.csv --agent    # rules + AI agent
 
 PayPal already warns users about possible scams on some Friends & Family payments. PayShield works one step earlier and more broadly: it **reads the message behind the payment** (the SMS, WhatsApp chat or invoice that made someone want to pay), explains what is wrong in Arabic or English, investigates the links, and works for any payment type.
 
+## Deploy your own copy on Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/zalkhwai-dev/payshield)
+
+The repo includes a [Render Blueprint](render.yaml). It creates a free web service with the right build and start commands, a health check, auto-deploy on every push, and visitor limits that protect the free AI quota. Render asks for your Gemini key and PayPal sandbox keys during setup; they are never stored in the repo. The [live demo](https://payshield-2w44.onrender.com) runs on exactly this setup.
+
 ## Run it locally
 
 Requires Python 3.10+.
@@ -111,6 +117,7 @@ Includes a mocked AI-agent loop (no API key needed). Also checks that real OTP n
 ```
 payshield/
 ├── app.py              Flask server + decision enforcement
+├── render.yaml         Render Blueprint (one-click deploy)
 ├── analyzer.py         Rule engine + final decision
 ├── agent.py            AI agent loop (Gemini / Claude) + screenshot reading
 ├── tools.py            Investigation tools the agent can call
